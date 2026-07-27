@@ -14,6 +14,6 @@ Backend WhatsApp clone membutuhkan runtime yang cocok untuk I/O-heavy, real-time
 
 ## Consequences
 
-- Mudah scaling horizontal dengan Redis adapter untuk Socket.IO.
+- Mudah scaling horizontal dengan Redis pub/sub untuk broadcast events ke semua instance.
 - PostgreSQL schema migrasi perlu dikelola rapi sejak awal.
 - Tidak memerlukan message broker berat (RabbitMQ/Kafka) untuk MVP — Redis pub/sub cukup.

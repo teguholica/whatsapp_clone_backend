@@ -15,7 +15,7 @@ Backend Node.js/TypeScript dengan PostgreSQL + Redis yang menyediakan:
 - Typing indicator real-time
 - Presence (online/offline)
 - Media upload (image, video, document)
-- REST API untuk CRUD + WebSocket (Socket.IO) untuk real-time events
+- REST API untuk CRUD + raw WebSocket (`@nestjs/platform-ws`) untuk real-time events
 
 ## User Stories
 
@@ -44,9 +44,10 @@ Backend Node.js/TypeScript dengan PostgreSQL + Redis yang menyediakan:
 
 ### Tech Stack
 - **Runtime:** Node.js + TypeScript
+- **Framework:** NestJS (modular, decorator-based, opinionated structure)
 - **Database:** PostgreSQL (relational, ACID)
-- **Cache/Pub-sub:** Redis (OTP storage, pub/sub for Socket.IO)
-- **Transport:** Socket.IO + Redis adapter (real-time) + REST (CRUD)
+- **Cache/Pub-sub:** Redis (OTP storage, pub/sub for multi-instance scaling)
+- **Transport:** Raw WebSocket via `@nestjs/platform-ws` + `ws` (real-time) + REST (CRUD)
 - **Auth:** Phone number + OTP (fake provider prints to log for development)
 - **File storage:** Local disk with S3-ready abstraction layer
 - **Message ID format:** ULID (sortable, unique, generated at application layer)
@@ -62,7 +63,7 @@ Backend Node.js/TypeScript dengan PostgreSQL + Redis yang menyediakan:
 ### Message Status State Machine
 - `sent` → `delivered` → `read`
 - `sent`: server has received and stored the message
-- `delivered`: Socket.IO has delivered to all active devices of recipient
+- `delivered`: WebSocket server has pushed to all active connections of recipient
 - `read`: recipient has opened the conversation (only for 1-on-1)
 - Read receipts for group conversations are out of scope for MVP.
 
@@ -99,28 +100,38 @@ Backend Node.js/TypeScript dengan PostgreSQL + Redis yang menyediakan:
 **Media:**
 - `POST /api/media/upload` — upload file, return mediaId
 
-### WebSocket Events
+### WebSocket Message Format (Raw JSON Over `ws`)
+
+All events are sent as JSON text frames with `event` and `data` fields.
+
 **Client → Server:**
-- `message:send` — send message to a conversation
-- `typing:start` — user started typing
-- `typing:stop` — user stopped typing
-- `presence:online` — user came online
+```json
+{ "event": "message:send", "data": { "conversationId": "...", "type": "text", "content": "Hello" } }
+{ "event": "typing:start", "data": { "conversationId": "..." } }
+{ "event": "typing:stop", "data": { "conversationId": "..." } }
+{ "event": "presence:online", "data": {} }
+```
 
 **Server → Client:**
-- `message:new` — new message in a conversation
-- `message:status` — delivery/read status update
-- `typing` — someone is typing in a conversation
-- `presence` — user online/offline status
+```json
+{ "event": "message:new", "data": { "id": "...", "senderId": "...", "conversationId": "...", "type": "text", "content": "Hello", "createdAt": "..." } }
+{ "event": "message:status", "data": { "messageId": "...", "userId": "...", "status": "delivered" } }
+{ "event": "typing", "data": { "conversationId": "...", "userId": "..." } }
+{ "event": "presence", "data": { "userId": "...", "status": "online" } }
+```
 
-### Module Structure (feature-based)
-- `auth/` — registration, OTP verification, JWT management
+### Module Structure (NestJS Feature Modules)
+
+Each module is a NestJS `@Module()` with its own controller, service, gateway (WebSocket), and repository:
+
+- `auth/` — `auth.module.ts`, `auth.controller.ts`, `auth.service.ts`, `auth.gateway.ts`
 - `user/` — profile, search
 - `conversation/` — conversation lifecycle, member management
-- `message/` — send, receive, delete, pagination
+- `message/` — send, receive, delete, pagination, status tracking
 - `group/` — group creation, admin management, membership
 - `media/` — file upload, storage
 - `presence/` — online/offline + typing indicator (in-memory + Redis pub/sub)
-- `shared/` — middleware, types, utils, db connection
+- `shared/` — guards, pipes, interceptors, types, utils, database connection
 
 ### Security
 - Rate limiting: 5 attempts/minute/phone for OTP verify
@@ -128,6 +139,38 @@ Backend Node.js/TypeScript dengan PostgreSQL + Redis yang menyediakan:
 - Message text limit: 4,096 characters
 - File type whitelist: jpg, png, gif, mp4, 3gp, pdf, doc, docx
 - Single device per user: new login invalidates old session
+- WebSocket rooms managed in-memory: conversation room membership tracked server-side per connection
+
+### Development Environment (Docker)
+
+**Scope:** Full containerization — PostgreSQL, Redis, and app backend all run in Docker.
+
+**Setup:**
+- One `docker-compose.yml` for development with hot-reload (tsx watch via bind mount).
+- One `Dockerfile` multi-stage with targets `dev` and `prod`.
+- Base image: `node:20-slim`.
+
+**Services:**
+- `postgres` — named volume `pgdata` for data persistence, port 5432.
+- `redis` — tmpfs (no persistence needed), port 6379.
+- `app` — bind mount source code, `tsx watch` for hot-reload, port 3000.
+
+**Network:** Custom Docker network `whatsapp-backend`. Services discoverable by hostname (`postgres`, `redis`, `app`).
+
+**Environment:**
+- Env vars in `.env` file, read by docker-compose via `${VAR}` substitution.
+- `.env.example` committed to repo as template.
+- Database URL: `postgres://user:pass@postgres:5432/whatsapp` in Docker, `localhost` outside.
+
+**Initialization:**
+- Manual migration via `npm run migrate` after services are up.
+- Helper script: `npm run db:up` starts postgres + redis, waits, runs migration.
+
+**Files created:**
+- `docker-compose.yml` — dev setup with all services
+- `Dockerfile` — multi-stage (target `dev` / `prod`)
+- `.env.example` — template for local env vars
+- `.env` — gitignored, actual values
 
 ## Testing Decisions
 
@@ -138,9 +181,9 @@ Backend Node.js/TypeScript dengan PostgreSQL + Redis yang menyediakan:
 
 ### Testing Seam
 The primary seam is the **HTTP + WebSocket server interface**. Tests will:
-1. Start the server with a test PostgreSQL database (dedicated test DB).
+1. Start a dedicated test PostgreSQL + Redis via docker-compose override or directly from test setup.
 2. Make HTTP requests using a test client (e.g., supertest or built-in fetch).
-3. Connect Socket.IO clients to test real-time flows (message delivery, typing, presence).
+3. Connect raw WebSocket clients to test real-time flows (message delivery, typing, presence).
 4. Assert on HTTP responses, database state, and received WebSocket events.
 
 This is the highest possible seam — it validates the entire system from the outside in, without exposing internal modules.
@@ -159,7 +202,7 @@ This is the highest possible seam — it validates the entire system from the ou
 - Error cases: unauthorized, rate limited, invalid input, conversation not found
 
 ### Prior Art
-Since this is a greenfield project, there is no prior art yet. Tests will follow patterns from the Node.js/TypeScript ecosystem (e.g., supertest for HTTP, Socket.IO test client for WebSocket).
+Since this is a greenfield project, there is no prior art yet. Tests will follow patterns from the Node.js/TypeScript ecosystem (e.g., supertest for HTTP, `ws` test client for WebSocket).
 
 ## Out of Scope
 - Voice/video calls
@@ -182,5 +225,7 @@ Since this is a greenfield project, there is no prior art yet. Tests will follow
 ## Further Notes
 - Fake OTP provider prints the 6-digit code to the server log. In production, swap to an SMS gateway via the OTP provider interface.
 - The media abstraction layer exposes a `StorageProvider` interface — swap from local disk to S3 by providing a new implementation without changing business logic.
-- Socket.IO rooms follow the convention `conversation:{conversationId}` for targeted event broadcasting.
+- WebSocket rooms follow the convention `conversation:{conversationId}` for targeted event broadcasting. Room membership tracked server-side in-memory per connection.
 - Horizontal scaling: add more server instances behind a load balancer; Redis adapter handles cross-instance event broadcasting.
+- Dev quickstart: `npm run db:up` starts Docker services and runs migration. `npm run dev` starts backend with hot-reload.
+- Production build: `docker build --target=prod .` produces a slim production image.

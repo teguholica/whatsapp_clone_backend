@@ -8,14 +8,15 @@ Backend akan memiliki 6-8 domain area (auth, user, conversation, message, group,
 
 ## Decision
 
-Setiap modul adalah direktori dengan file-file berikut (hanya yang dibutuhkan):
+Setiap modul adalah NestJS `@Module()` dengan file-file berikut (hanya yang dibutuhkan):
+- `{module}.module.ts` — NestJS module definition
 - `{module}.controller.ts` — HTTP route handlers
 - `{module}.service.ts` — business logic
 - `{module}.repository.ts` — database access
+- `{module}.gateway.ts` — WebSocket event handlers (via `@nestjs/platform-ws`)
 - `{module}.types.ts` — type definitions
-- `{module}.socket.ts` — WebSocket event handlers (jika ada)
 
-Modul shared (middleware, utils, types) dipisah di `shared/`.
+Modul shared (guards, pipes, interceptors, utils, types) dipisah di `shared/`.
 
 ## Consequences
 

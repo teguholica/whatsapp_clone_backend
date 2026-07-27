@@ -1,20 +1,22 @@
-# ADR 0003: Socket.IO + Redis Adapter untuk Real-time Transport
+# ADR 0003: Raw WebSocket via `@nestjs/platform-ws` untuk Real-time Transport
 
-Kami memilih Socket.IO sebagai real-time transport layer dengan Redis adapter untuk horizontal scaling.
+Kami memilih raw WebSocket (`ws`) via `@nestjs/platform-ws` adapter sebagai real-time transport layer, bukan Socket.IO.
 
 ## Context
 
-WhatsApp clone membutuhkan real-time delivery untuk messages, typing indicator, dan presence updates. Pilihan transport utama: WebSocket, SSE, atau Socket.IO yang membungkus WebSocket dengan fallback transport dan fitur built-in (rooms, reconnection, acknowledgements).
+WhatsApp clone membutuhkan real-time delivery untuk messages, typing indicator, dan presence updates. Client utama adalah aplikasi mobile native (Android/iOS). Socket.IO memiliki protocol sendiri yang tidak kompatibel dengan native WebSocket tanpa library tambahan. Raw WebSocket (RFC 6455) didukung nativ oleh semua platform mobile dan web.
 
 ## Decision
 
-- **Socket.IO** sebagai transport. Memberikan: room management (per-conversation), auto-reconnection, message acknowledgements, dan fallback ke long-polling jika WebSocket tidak tersedia.
-- **Redis adapter** (`@socket.io/redis-adapter`) untuk broadcast events ke semua instance server. Tanpa ini, typing indicator dan message delivery hanya sampai ke koneksi di server yang sama.
-- **REST + WebSocket hybrid** — REST untuk operasi CRUD (register, create group, fetch history, dll), WebSocket khusus untuk real-time events.
+- **`@nestjs/platform-ws`** — NestJS adapter yang membungkus library `ws`. Memberikan decorator NestJS (`@WebSocketGateway`, `@SubscribeMessage`) untuk raw WebSocket murni.
+- **Message format** — JSON text frames dengan struktur `{ event: string, data: object }`. Server parsing manual tanpa packet encoding seperti Socket.IO.
+- **Tidak ada Redis adapter untuk MVP** — single instance server cukup dengan in-memory room management. Redis adapter akan ditambahkan saat horizontal scaling diperlukan.
+- **Tidak ada auto-reconnection built-in** — client mobile harus handle reconnection logic sendiri.
+- **REST + WebSocket hybrid** — REST untuk operasi CRUD (register, create group, fetch history, dll), WebSocket untuk real-time events saja.
 
 ## Consequences
 
-- Single device per user untuk MVP — satu koneksi Socket.IO per user.
-- Socket.IO room naming convention: `conversation:{conversationId}` untuk broadcast per-chat.
-- Client events: `message:send`, `typing:start`, `typing:stop`, `presence:online`.
-- Server events: `message:new`, `message:status`, `typing`, `presence`.
+- Client mobile bisa pakai `ws`/`okhttp3.WebSocket`/`URLSessionWebSocketTask` langsung tanpa library tambahan.
+- Server perlu implement sendiri room management (track WebSocket connections per conversationId).
+- Tidak ada built-in acknowledgement — client perlu kirim ack event jika diperlukan.
+- Tidak ada fallback transport — WebSocket harus available. Jika tidak, client harus fallback ke polling REST.
