@@ -146,15 +146,18 @@ Each module is a NestJS `@Module()` with its own controller, service, gateway (W
 **Scope:** Full containerization — PostgreSQL, Redis, and app backend all run in Docker.
 
 **Setup:**
-- One `docker-compose.yml` for development with hot-reload (tsx watch via bind mount).
+- One `docker-compose.yml` for core services (postgres, redis, app).
+- One `docker-compose.dev.yml` for dev-only tools (dozzle).
 - One `Dockerfile` multi-stage with targets `dev` and `prod`.
 - Base image: `node:20-slim`.
 
-**Services:**
+**Services (core — `docker-compose.yml`):**
 - `postgres` — named volume `pgdata` for data persistence, port 5432.
 - `redis` — tmpfs (no persistence needed), port 6379.
 - `app` — bind mount source code, `tsx watch` for hot-reload, port 3000.
-- `dozzle` — Docker log viewer UI, port 127.0.0.1:8888, Docker socket mounted.
+
+**Services (dev-only — `docker-compose.dev.yml`):**
+- `dozzle` — Docker log viewer UI, port 127.0.0.1:8888, Docker socket mounted. Filtered via `DOZZLE_FILTER=name=whatsapp-*` to only capture logs from this project's containers. Not included in production deployments.
 
 **Network:** Custom Docker network `whatsapp-backend`. Services discoverable by hostname (`postgres`, `redis`, `app`).
 
@@ -168,7 +171,8 @@ Each module is a NestJS `@Module()` with its own controller, service, gateway (W
 - Helper script: `npm run db:up` starts postgres + redis, waits, runs migration.
 
 **Files created:**
-- `docker-compose.yml` — dev setup with all services
+- `docker-compose.yml` — core services (postgres, redis, app)
+- `docker-compose.dev.yml` — dev-only tools (dozzle)
 - `Dockerfile` — multi-stage (target `dev` / `prod`)
 - `.env.example` — template for local env vars
 - `.env` — gitignored, actual values

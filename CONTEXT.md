@@ -35,3 +35,12 @@ A JWT-based session tied to a phone number verified via OTP. Single device per u
 
 **Media**:
 Binary content attached to a message: image, video, audio, or document. Stored on local disk with S3-ready abstraction. Max: image 16MB, video 64MB, document 100MB.
+
+**DevEnv**:
+Local development environment using Docker Compose. Core services (postgres, redis, app) in `docker-compose.yml`. Dev-only tools (e.g. Dozzle) in `docker-compose.dev.yml`. Run with `-f docker-compose.dev.yml` flag.
+
+**Dozzle**:
+Web UI log viewer for Docker containers running in the DevEnv. Filtered to `whatsapp-*` containers only. Accessed at `http://localhost:8888`. Not available in production.
+
+**Logging**:
+Real-time container log viewing via Dozzle in development. Production logs may use a different strategy (e.g. Loki + Grafana) — deferred. For MVP, production logging via stdout + Docker logs.

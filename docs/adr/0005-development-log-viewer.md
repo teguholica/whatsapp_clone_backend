@@ -8,14 +8,17 @@ Selama development, perlu melihat log dari PostgreSQL, Redis, dan app backend se
 
 ## Decision
 
-- **Dozzle** sebagai container terpisah di docker-compose.yml.
+- **Dozzle** sebagai container di `docker-compose.dev.yml` — service ini **development-only**, tidak masuk production compose.
+- Filter container: `DOZZLE_FILTER=name=whatsapp-*` — hanya menangkap log container ber-prefix `whatsapp-`. Container project lain di host yg sama tidak terlihat.
 - Port 8888 dibatasi ke localhost (127.0.0.1) — tidak bisa diakses dari luar.
-- Mount Docker socket untuk akses log container lain.
+- Mount Docker socket untuk akses log container.
 - Tanpa autentikasi — hanya untuk development lokal.
-- Tidak perlu tetap di production compose — service ini development-only.
+- Developer menjalankan: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d` untuk full stack + dozzle.
 
 ## Consequences
 
-- Developer bisa lihat log semua container di http://localhost:8888 tanpa terminal.
-- Mount Docker socket adalah security risk jika diakses dari luar — dibatasi ke localhost untuk mitigasi.
+- Developer bisa lihat log container whatsapp-* di http://localhost:8888 tanpa terminal.
+- Log container luar project tidak tampak — Dozzle hanya fokus ke `whatsapp-*`.
+- Mount Docker socket tetap security risk jika diakses dari luar — dibatasi ke localhost untuk mitigasi.
 - Tidak ada impact ke application code atau performance.
+- Developer perlu tambah `-f docker-compose.dev.yml` untuk mengaktifkan Dozzle.
