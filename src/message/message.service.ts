@@ -1,11 +1,15 @@
 import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { DatabaseService } from '../shared/database/database.service';
+import { WsGateway } from '../ws/ws.gateway';
 import { MessageResponse } from './message.types';
 
 @Injectable()
 export class MessageService {
-  constructor(@Inject(DatabaseService) private db: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private db: DatabaseService,
+    @Inject(WsGateway) private ws: WsGateway,
+  ) {}
 
   async send(conversationId: string, senderId: string, content: string): Promise<MessageResponse> {
     const conv = await this.db.getPool().query(
@@ -22,7 +26,37 @@ export class MessageService {
       [id, conversationId, senderId, content],
     );
 
-    return this.getById(id);
+    const members = await this.db.getPool().query(
+      `SELECT user_id FROM conversation_members
+       WHERE conversation_id = $1 AND user_id != $2 AND left_at IS NULL`,
+      [conversationId, senderId],
+    );
+
+    for (const member of members.rows) {
+      await this.db.getPool().query(
+        `INSERT INTO message_status (message_id, user_id, status, updated_at)
+         VALUES ($1, $2, 'sent', NOW())`,
+        [id, member.user_id],
+      );
+    }
+
+    const msg = await this.getById(id);
+    const deliveredTo = this.ws.broadcastToRoom(conversationId, 'message:new', msg, senderId);
+
+    if (deliveredTo.length > 0) {
+      for (const userId of deliveredTo) {
+        await this.db.getPool().query(
+          `UPDATE message_status SET status = 'delivered', updated_at = NOW()
+           WHERE message_id = $1 AND user_id = $2 AND status = 'sent'`,
+          [id, userId],
+        );
+        this.ws.broadcastToRoom(conversationId, 'message:status', {
+          messageId: id, userId, status: 'delivered',
+        }, senderId);
+      }
+    }
+
+    return msg;
   }
 
   async list(
