@@ -15,6 +15,7 @@ interface AuthUser {
 export class WsGateway {
   private wss!: WsServer;
   private connections = new Map<WebSocket, AuthUser>();
+  private typingTimeouts = new Map<string, NodeJS.Timeout>();
 
   constructor(
     @Inject(RedisService) private redis: RedisService,
@@ -74,14 +75,87 @@ export class WsGateway {
             if (readUser && readData.messageId) this.markRead(readData.messageId, readUser.id);
             break;
           }
+          case 'typing:start':
+          case 'typing:stop': {
+            const typingUser = this.connections.get(client);
+            const typingData = msg.data || {};
+            if (typingUser && typingData.conversationId) {
+              this.handleTyping(client, typingUser, msg.event, typingData.conversationId);
+            }
+            break;
+          }
+          case 'presence:online': {
+            const presenceUser = this.connections.get(client);
+            if (presenceUser) {
+              this.broadcastToAll('presence', { userId: presenceUser.id, status: 'online' });
+            }
+            break;
+          }
         }
       });
 
-      client.on('close', () => {
+      client.on('close', async () => {
+        const user = this.connections.get(client);
         this.rooms.leaveAll(client);
         this.connections.delete(client);
+        if (user) {
+          await this.db.getPool().query(
+            'UPDATE users SET last_seen_at = NOW() WHERE id = $1', [user.id],
+          );
+          this.broadcastToAll('presence', {
+            userId: user.id,
+            status: 'offline',
+            lastSeenAt: new Date().toISOString(),
+          });
+          for (const [key, timeout] of this.typingTimeouts) {
+            if (key.endsWith(`:${user.id}`)) {
+              clearTimeout(timeout);
+              this.typingTimeouts.delete(key);
+            }
+          }
+        }
       });
     });
+  }
+
+  private async handleTyping(client: WebSocket, user: AuthUser, event: string, conversationId: string): Promise<void> {
+    const key = `${conversationId}:${user.id}`;
+    if (event === 'typing:stop') {
+      const existing = this.typingTimeouts.get(key);
+      if (existing) { clearTimeout(existing); this.typingTimeouts.delete(key); }
+      this.broadcastToRoom(conversationId, 'typing:stop', { conversationId, userId: user.id }, user.id);
+      return;
+    }
+
+    const convType = await this.getConversationType(conversationId);
+    const includeUserId = convType !== 'group';
+    this.broadcastToRoom(conversationId, 'typing', {
+      conversationId,
+      ...(includeUserId ? { userId: user.id } : {}),
+    }, user.id);
+
+    const existing = this.typingTimeouts.get(key);
+    if (existing) clearTimeout(existing);
+    this.typingTimeouts.set(key, setTimeout(() => {
+      this.broadcastToRoom(conversationId, 'typing:stop', { conversationId, userId: user.id }, user.id);
+      this.typingTimeouts.delete(key);
+    }, 5000));
+  }
+
+  private async getConversationType(conversationId: string): Promise<string | null> {
+    try {
+      const result = await this.db.getPool().query(
+        'SELECT type FROM conversations WHERE id = $1', [conversationId],
+      );
+      return result.rows[0]?.type ?? null;
+    } catch { return null; }
+  }
+
+  private broadcastToAll(event: string, data: any): void {
+    const message = JSON.stringify({ event, data });
+    for (const [client] of this.connections) {
+      if (client.readyState === 1) client.send(message);
+    }
   }
 
   private async deliverPending(client: WebSocket, conversationId: string, userId: string): Promise<void> {

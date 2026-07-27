@@ -32,10 +32,12 @@ export class WsRoomManager {
   broadcast(roomId: string, event: string, data: any): void {
     const message = JSON.stringify({ event, data });
     const clients = this.rooms.get(roomId);
+    console.log(`[WS-RM] broadcast ${event} to ${roomId}, clients: ${clients?.size || 0}`);
     if (!clients) return;
     for (const client of clients) {
       if (client.readyState === 1) {
         client.send(message);
+        console.log(`[WS-RM] Sent ${event} to client`);
       }
     }
   }
