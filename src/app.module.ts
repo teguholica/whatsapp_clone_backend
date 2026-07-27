@@ -3,8 +3,9 @@ import { DatabaseModule } from './shared/database/database.module';
 import { RedisModule } from './shared/redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
+import { UserModule } from './user/user.module';
 
 @Module({
-  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule],
+  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule],
 })
 export class AppModule {}
