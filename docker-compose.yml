@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: whatsapp-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: whatsapp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - whatsapp-backend
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: whatsapp-redis
+    ports:
+      - "6379:6379"
+    tmpfs: /data
+    networks:
+      - whatsapp-backend
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      target: dev
+    container_name: whatsapp-app
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/whatsapp
+      REDIS_URL: redis://redis:6379
+    networks:
+      - whatsapp-backend
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: whatsapp-dozzle
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - whatsapp-backend
+    restart: unless-stopped
+
+networks:
+  whatsapp-backend:
+    driver: bridge
+
+volumes:
+  pgdata:
