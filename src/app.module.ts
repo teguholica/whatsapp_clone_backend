@@ -8,8 +8,9 @@ import { ConversationModule } from './conversation/conversation.module';
 import { MessageModule } from './message/message.module';
 import { WsModule } from './ws/ws.module';
 import { GroupModule } from './group/group.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
-  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule, ConversationModule, MessageModule, WsModule, GroupModule],
+  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule, ConversationModule, MessageModule, WsModule, GroupModule, MediaModule],
 })
 export class AppModule {}

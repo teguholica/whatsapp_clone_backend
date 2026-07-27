@@ -1,4 +1,4 @@
-import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { DatabaseService } from '../shared/database/database.service';
 import { WsGateway } from '../ws/ws.gateway';
@@ -59,6 +59,41 @@ export class MessageService {
     return msg;
   }
 
+  async delete(messageId: string, userId: string, mode: 'me' | 'everyone'): Promise<{ message: string }> {
+    const msg = await this.db.getPool().query(
+      'SELECT id, conversation_id, sender_id, created_at FROM messages WHERE id = $1',
+      [messageId],
+    );
+    if (msg.rows.length === 0) throw new NotFoundException('Message not found');
+
+    if (mode === 'everyone') {
+      if (msg.rows[0].sender_id !== userId) {
+        throw new ForbiddenException('Only the sender can delete for everyone');
+      }
+      const age = Date.now() - new Date(msg.rows[0].created_at).getTime();
+      if (age > 30 * 60 * 1000) {
+        throw new BadRequestException('Cannot delete for everyone after 30 minutes');
+      }
+      await this.db.getPool().query(
+        'UPDATE messages SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2',
+        [userId, messageId],
+      );
+    } else {
+      await this.db.getPool().query(
+        `INSERT INTO message_deletions (message_id, user_id, deleted_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (message_id, user_id) DO UPDATE SET deleted_at = NOW()`,
+        [messageId, userId],
+      );
+    }
+
+    this.ws.broadcastToRoom(msg.rows[0].conversation_id, 'message:deleted', {
+      messageId, mode,
+    }, userId);
+
+    return { message: 'Message deleted' };
+  }
+
   async list(
     conversationId: string,
     userId: string,
@@ -79,22 +114,29 @@ export class MessageService {
 
     if (before) {
       query = `
-        SELECT id, conversation_id, sender_id, type, content, created_at
-        FROM messages
-        WHERE conversation_id = $1 AND deleted_at IS NULL AND id < $2
-        ORDER BY id DESC
-        LIMIT $3
+        SELECT m.id, m.conversation_id, m.sender_id, m.type, m.content, m.created_at
+        FROM messages m
+        LEFT JOIN message_deletions md ON md.message_id = m.id AND md.user_id = $3
+        WHERE m.conversation_id = $1
+          AND m.deleted_at IS NULL
+          AND md.deleted_at IS NULL
+          AND m.id < $2
+        ORDER BY m.id DESC
+        LIMIT $4
       `;
-      params = [conversationId, before, safeLimit];
+      params = [conversationId, before, userId, safeLimit];
     } else {
       query = `
-        SELECT id, conversation_id, sender_id, type, content, created_at
-        FROM messages
-        WHERE conversation_id = $1 AND deleted_at IS NULL
-        ORDER BY id DESC
+        SELECT m.id, m.conversation_id, m.sender_id, m.type, m.content, m.created_at
+        FROM messages m
+        LEFT JOIN message_deletions md ON md.message_id = m.id AND md.user_id = $3
+        WHERE m.conversation_id = $1
+          AND m.deleted_at IS NULL
+          AND md.deleted_at IS NULL
+        ORDER BY m.id DESC
         LIMIT $2
       `;
-      params = [conversationId, safeLimit];
+      params = [conversationId, safeLimit, userId];
     }
 
     const result = await this.db.getPool().query(query, params);

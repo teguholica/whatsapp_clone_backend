@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Body, Param, Query, UseGuards, Inject, DefaultValuePipe, ParseIntPipe, BadRequestException,
+  Controller, Post, Get, Delete, Body, Param, Query, UseGuards, Inject, DefaultValuePipe, ParseIntPipe, BadRequestException,
 } from '@nestjs/common';
 import { MessageService } from './message.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -32,5 +32,17 @@ export class MessageController {
     @Query('before') before?: string,
   ) {
     return this.msg.list(conversationId, user.id, limit, before);
+  }
+
+  @Delete(':messageId')
+  async remove(
+    @CurrentUser() user: any,
+    @Param('messageId') messageId: string,
+    @Query('mode') mode: string,
+  ) {
+    if (!mode || !['me', 'everyone'].includes(mode)) {
+      throw new BadRequestException('mode must be "me" or "everyone"');
+    }
+    return this.msg.delete(messageId, user.id, mode as 'me' | 'everyone');
   }
 }

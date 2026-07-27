@@ -99,6 +99,22 @@ async function migrate() {
     } else {
       console.log('Migration 004_create_groups already applied, skipping');
     }
+
+    const delResult = await pool.query(`SELECT name FROM migrations WHERE name = '005_message_deletions'`);
+    if (delResult.rows.length === 0) {
+      await pool.query(`
+        CREATE TABLE message_deletions (
+          message_id TEXT NOT NULL REFERENCES messages(id),
+          user_id TEXT NOT NULL REFERENCES users(id),
+          deleted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (message_id, user_id)
+        );
+      `);
+      await pool.query(`INSERT INTO migrations (name) VALUES ('005_message_deletions')`);
+      console.log('Migration 005_message_deletions applied');
+    } else {
+      console.log('Migration 005_message_deletions already applied, skipping');
+    }
   } catch (err) {
     console.error('Migration failed:', err.message);
     process.exit(1);
