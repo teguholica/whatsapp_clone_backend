@@ -1,8 +1,14 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { RedisService } from '../shared/redis/redis.service';
 
+export interface OtpProvider {
+  generate(phone: string): Promise<string>;
+  verify(phone: string, code: string): Promise<boolean>;
+  consume(phone: string): Promise<void>;
+}
+
 @Injectable()
-export class OtpService {
+export class OtpService implements OtpProvider {
   private readonly ttl = 300;
 
   constructor(@Inject(RedisService) private redis: RedisService) {}
@@ -19,7 +25,10 @@ export class OtpService {
     const key = `otp:${phone}`;
     const stored = await this.redis.getClient().get(key);
     if (!stored || stored !== code) return false;
-    await this.redis.getClient().del(key);
     return true;
+  }
+
+  async consume(phone: string): Promise<void> {
+    await this.redis.getClient().del(`otp:${phone}`);
   }
 }

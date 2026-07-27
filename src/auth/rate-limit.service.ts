@@ -8,9 +8,7 @@ export class RateLimitService {
   async check(key: string, maxAttempts: number, windowSec: number): Promise<boolean> {
     const redisKey = `ratelimit:${key}`;
     const current = await this.redis.getClient().incr(redisKey);
-    if (current === 1) {
-      await this.redis.getClient().expire(redisKey, windowSec);
-    }
+    await this.redis.getClient().expire(redisKey, windowSec);
     return current <= maxAttempts;
   }
 }

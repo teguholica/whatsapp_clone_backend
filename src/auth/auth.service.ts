@@ -1,4 +1,4 @@
-import { Injectable, Inject, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ulid } from 'ulid';
 import { DatabaseService } from '../shared/database/database.service';
@@ -16,12 +16,6 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<void> {
-    const existing = await this.db.getPool().query(
-      'SELECT id FROM users WHERE phone = $1', [dto.phone],
-    );
-    if (existing.rows.length > 0) {
-      throw new ConflictException('Phone already registered');
-    }
     await this.otp.generate(dto.phone);
   }
 
@@ -45,6 +39,8 @@ export class AuthService {
         'SELECT id, phone, display_name FROM users WHERE id = $1', [id],
       );
     }
+
+    await this.otp.consume(dto.phone);
 
     const payload: JwtPayload = { sub: user.rows[0].id, phone: dto.phone };
 
