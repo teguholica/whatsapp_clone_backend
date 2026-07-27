@@ -7,8 +7,9 @@ import { UserModule } from './user/user.module';
 import { ConversationModule } from './conversation/conversation.module';
 import { MessageModule } from './message/message.module';
 import { WsModule } from './ws/ws.module';
+import { GroupModule } from './group/group.module';
 
 @Module({
-  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule, ConversationModule, MessageModule, WsModule],
+  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule, ConversationModule, MessageModule, WsModule, GroupModule],
 })
 export class AppModule {}

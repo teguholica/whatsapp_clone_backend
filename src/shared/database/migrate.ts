@@ -83,6 +83,22 @@ async function migrate() {
     } else {
       console.log('Migration 003_create_messages already applied, skipping');
     }
+
+    const grpResult = await pool.query(`SELECT name FROM migrations WHERE name = '004_create_groups'`);
+    if (grpResult.rows.length === 0) {
+      await pool.query(`
+        ALTER TABLE conversations ADD COLUMN IF NOT EXISTS name VARCHAR(100);
+        CREATE TABLE IF NOT EXISTS group_admins (
+          conversation_id TEXT NOT NULL REFERENCES conversations(id),
+          user_id TEXT NOT NULL REFERENCES users(id),
+          PRIMARY KEY (conversation_id, user_id)
+        );
+      `);
+      await pool.query(`INSERT INTO migrations (name) VALUES ('004_create_groups')`);
+      console.log('Migration 004_create_groups applied');
+    } else {
+      console.log('Migration 004_create_groups already applied, skipping');
+    }
   } catch (err) {
     console.error('Migration failed:', err.message);
     process.exit(1);
