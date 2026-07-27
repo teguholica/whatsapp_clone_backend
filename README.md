@@ -45,12 +45,16 @@ npm run migrate
 npm run dev
 ```
 
-Server runs on `http://localhost:3000`. Log viewer at `http://localhost:8888` (Dozzle).
+Server runs on `http://localhost:3000`. Log viewer at `http://localhost:8888` (Dozzle, dev-only — lihat [Full Docker](#full-docker-all-services-in-containers)).
 
 ### Full Docker (all services in containers)
 
 ```bash
+# Core services only (postgres, redis, app)
 docker compose up -d
+
+# With dev tools (Dozzle log viewer)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
 ## API
