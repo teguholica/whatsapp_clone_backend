@@ -4,8 +4,9 @@ import { RedisModule } from './shared/redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
+import { ConversationModule } from './conversation/conversation.module';
 
 @Module({
-  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule],
+  imports: [DatabaseModule, RedisModule, HealthModule, AuthModule, UserModule, ConversationModule],
 })
 export class AppModule {}
