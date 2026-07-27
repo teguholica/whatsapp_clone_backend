@@ -154,6 +154,7 @@ Each module is a NestJS `@Module()` with its own controller, service, gateway (W
 - `postgres` — named volume `pgdata` for data persistence, port 5432.
 - `redis` — tmpfs (no persistence needed), port 6379.
 - `app` — bind mount source code, `tsx watch` for hot-reload, port 3000.
+- `dozzle` — Docker log viewer UI, port 127.0.0.1:8888, Docker socket mounted.
 
 **Network:** Custom Docker network `whatsapp-backend`. Services discoverable by hostname (`postgres`, `redis`, `app`).
 
