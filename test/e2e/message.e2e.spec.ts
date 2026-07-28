@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { DatabaseService } from 'src/shared/database/database.service';
-import { createTestApp, createUser, cleanup, TestUser } from './setup';
+import { createTestApp, createUser, cleanup, createWsClient, waitForWsEvent, sendWsMessage, TestUser } from './setup';
 
 describe('Message E2E', () => {
   let app: INestApplication;
@@ -221,6 +221,120 @@ describe('Message E2E', () => {
         request(app.getHttpServer())
           .delete('/api/messages/nonexistent?mode=me'),
       ).expect(404);
+    });
+  });
+
+  describe('message status lifecycle', () => {
+    async function sendMessage(token: string, content: string) {
+      const res = await auth(token)(
+        request(app.getHttpServer())
+          .post(`/api/messages/${conversationId}`)
+          .send({ content }),
+      ).expect(201);
+      return res.body;
+    }
+
+    it('creates a sent status row for recipient after sending', async () => {
+      const msg = await sendMessage(userA.accessToken, 'Hello!');
+
+      const db = app.get(DatabaseService);
+      const result = await db.getPool().query(
+        'SELECT status FROM message_status WHERE message_id = $1 AND user_id = $2',
+        [msg.id, userB.user.id],
+      );
+
+      expect(result.rows[0].status).toBe('sent');
+    });
+
+    it('upgrades status to delivered when recipient joins room via WS', async () => {
+      const msg = await sendMessage(userA.accessToken, 'Hello!');
+
+      const wsB = await createWsClient(app, userB.accessToken);
+
+      const db = app.get(DatabaseService);
+
+      // send room:join and wait for deliverPending
+      await sendWsMessage(wsB, 'room:join', { conversationId });
+      for (let i = 0; i < 30; i++) {
+        const r = await db.getPool().query(
+          'SELECT status FROM message_status WHERE message_id = $1 AND user_id = $2',
+          [msg.id, userB.user.id],
+        );
+        if (r.rows[0]?.status === 'delivered') break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      const result = await db.getPool().query(
+        'SELECT status FROM message_status WHERE message_id = $1 AND user_id = $2',
+        [msg.id, userB.user.id],
+      );
+      expect(result.rows[0].status).toBe('delivered');
+
+      wsB.close();
+    });
+
+    it('upgrades status to read when recipient sends message:read event', async () => {
+      const msg = await sendMessage(userA.accessToken, 'Hello!');
+
+      const wsB = await createWsClient(app, userB.accessToken);
+      await sendWsMessage(wsB, 'room:join', { conversationId });
+
+      // wait for deliverPending to upgrade to delivered
+      await new Promise((r) => setTimeout(r, 300));
+
+      await sendWsMessage(wsB, 'message:read', { messageId: msg.id });
+
+      // wait for markRead to process
+      await new Promise((r) => setTimeout(r, 500));
+
+      const db = app.get(DatabaseService);
+      const result = await db.getPool().query(
+        'SELECT status FROM message_status WHERE message_id = $1 AND user_id = $2',
+        [msg.id, userB.user.id],
+      );
+      expect(result.rows[0].status).toBe('read');
+
+      wsB.close();
+    });
+
+    it('does not let non-recipient trigger a read status update', async () => {
+      const msg = await sendMessage(userA.accessToken, 'Hello!');
+
+      const wsC = await createWsClient(app, userC.accessToken);
+      await sendWsMessage(wsC, 'message:read', { messageId: msg.id });
+      await new Promise((r) => setTimeout(r, 500));
+
+      const db = app.get(DatabaseService);
+      const result = await db.getPool().query(
+        'SELECT status FROM message_status WHERE message_id = $1 AND user_id = $2',
+        [msg.id, userB.user.id],
+      );
+      expect(result.rows[0].status).toBe('sent');
+
+      wsC.close();
+    });
+
+    it('is idempotent on re-join', async () => {
+      const msg = await sendMessage(userA.accessToken, 'Hello!');
+
+      const wsB = await createWsClient(app, userB.accessToken);
+      await sendWsMessage(wsB, 'room:join', { conversationId });
+
+      // wait for deliverPending
+      await new Promise((r) => setTimeout(r, 500));
+
+      await sendWsMessage(wsB, 'room:leave', { conversationId });
+      await sendWsMessage(wsB, 'room:join', { conversationId });
+      await new Promise((r) => setTimeout(r, 500));
+
+      const db = app.get(DatabaseService);
+      const result = await db.getPool().query(
+        'SELECT status FROM message_status WHERE message_id = $1 AND user_id = $2',
+        [msg.id, userB.user.id],
+      );
+      expect(result.rows[0].status).toBe('delivered');
+
+      wsB.close();
     });
   });
 });
