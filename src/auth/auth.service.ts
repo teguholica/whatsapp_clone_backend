@@ -56,6 +56,7 @@ export class AuthService {
 
     const sessionKey = `session:${user.rows[0].id}`;
     await this.redis.getClient().set(sessionKey, accessToken, 'EX', 7 * 86400);
+    await this.redis.getClient().set(`refresh:${user.rows[0].id}`, refreshToken, 'EX', 7 * 86400);
 
     return {
       accessToken,

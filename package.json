@@ -10,7 +10,8 @@
     "db:up": "docker compose up -d postgres redis && sleep 2 && npm run migrate",
     "lint": "tsc --noEmit",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "test:e2e": "jest --config jest-e2e.config.ts --runInBand --forceExit"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -39,8 +40,10 @@
     "@types/node": "^22.10.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.11.10",
+    "@types/supertest": "^7.2.1",
     "@types/ws": "^8.5.13",
     "jest": "^30.4.2",
+    "supertest": "^7.2.2",
     "ts-jest": "^29.4.12",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
