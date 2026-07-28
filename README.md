@@ -192,6 +192,45 @@ Offline messages delivered via `deliverPending` on room join — status transiti
 | `npm run migrate` | Run database migrations |
 | `npm run db:up` | Start Docker services + migrate |
 | `npm run typecheck` | TypeScript type check |
+| `npm test` | Unit tests (Jest, mocked services) |
+| `npm run test:e2e` | E2E tests (real DB + Redis via Docker, `--runInBand`) |
+
+## Testing
+
+### Unit Tests
+
+```bash
+npm test
+```
+
+Unit tests use `@nestjs/testing` with mocked services (DatabaseService, RedisService, JwtService). Located next to source files (`*.spec.ts`).
+
+### E2E Tests
+
+```bash
+# Ensure PostgreSQL + Redis are running
+docker compose up -d postgres redis
+
+# Run E2E suite (creates whatsapp_test DB, runs migrations automatically)
+npm run test:e2e
+```
+
+E2E tests exercise the full stack against a real PostgreSQL (`whatsapp_test` database) and Redis (database index 1). Tests create users through the real OTP auth flow — no direct DB inserts for user setup.
+
+**Test files** (`test/e2e/`):
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `auth.e2e.spec.ts` | 8 | register, verify, refresh, rate limit |
+| `health.e2e.spec.ts` | 1 | health endpoint |
+| `user.e2e.spec.ts` | 7 | profile CRUD, search |
+| `conversation.e2e.spec.ts` | 9 | create, list, detail, leave, idempotent |
+| `message.e2e.spec.ts` | 11 | send, paginate, delete, 30min window |
+| `group.e2e.spec.ts` | 12 | CRUD, members, admins, RBAC |
+| `media.e2e.spec.ts` | 3 | upload, reject invalid type, auth |
+| `ws.e2e.spec.ts` | 2 | connect valid token, 4001 no token |
+
+**Total: 59 E2E tests**
 
 ## Environment Variables
 
