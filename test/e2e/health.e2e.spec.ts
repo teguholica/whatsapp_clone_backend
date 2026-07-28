@@ -10,7 +10,7 @@ describe('Health E2E', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    // app closed via --forceExit
   });
 
   beforeEach(async () => {

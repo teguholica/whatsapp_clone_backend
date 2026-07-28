@@ -4,6 +4,7 @@ import { AppModule } from 'src/app.module';
 import { RedisService } from 'src/shared/redis/redis.service';
 import { DatabaseService } from 'src/shared/database/database.service';
 import { WsGateway } from 'src/ws/ws.gateway';
+import { WsRoomManager } from 'src/ws/ws-room-manager';
 import request from 'supertest';
 import { Pool } from 'pg';
 import { WebSocket } from 'ws';
@@ -137,8 +138,18 @@ async function runMigrations(): Promise<void> {
 
 let cachedApp: INestApplication | null = null;
 
+async function isAppAlive(app: INestApplication): Promise<boolean> {
+  try {
+    const addr = app.getHttpServer().address();
+    return addr !== null;
+  } catch { return false; }
+}
+
 export async function createTestApp(): Promise<INestApplication> {
-  if (cachedApp) return cachedApp;
+  if (cachedApp) {
+    if (await isAppAlive(cachedApp)) return cachedApp;
+    cachedApp = null;
+  }
 
   await ensureTestDb();
 
@@ -150,6 +161,7 @@ export async function createTestApp(): Promise<INestApplication> {
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   await app.init();
+  await app.listen(0);
 
   const wsGateway = app.get(WsGateway);
   const httpServer = app.getHttpServer();
@@ -208,6 +220,12 @@ export async function cleanup(app: INestApplication): Promise<void> {
 
   const redis = app.get(RedisService);
   await redis.getClient().flushdb();
+
+  const wsGateway = app.get(WsGateway);
+  for (const key of (wsGateway as any).typingTimeouts?.keys() ?? []) {
+    clearTimeout((wsGateway as any).typingTimeouts.get(key));
+  }
+  (wsGateway as any).typingTimeouts?.clear();
 }
 
 export async function closeTestApp(): Promise<void> {
@@ -231,6 +249,11 @@ export function waitForWsEvent(ws: WebSocket, event: string, timeout = 3000): Pr
     };
     ws.on('message', handler);
   });
+}
+
+export async function sendWsMessage(ws: WebSocket, event: string, data: any): Promise<void> {
+  ws.send(JSON.stringify({ event, data }));
+  await new Promise((r) => setTimeout(r, 100));
 }
 
 export async function createWsClient(app: INestApplication, token: string): Promise<WebSocket> {
