@@ -191,7 +191,7 @@ Offline messages delivered via `deliverPending` on room join — status transiti
 | `npm run start` | Start production build |
 | `npm run migrate` | Run database migrations |
 | `npm run db:up` | Start Docker services + migrate |
-| `npm run typecheck` | TypeScript type check |
+| `npm run lint` | TypeScript type check |
 | `npm test` | Unit tests (Jest, mocked services) |
 | `npm run test:e2e` | E2E tests (real DB + Redis via Docker, `--runInBand`) |
 
