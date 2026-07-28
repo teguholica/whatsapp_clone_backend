@@ -48,6 +48,7 @@ services:
 
 networks:
   whatsapp-backend:
+    name: whatsapp-backend
     driver: bridge
 
 volumes:
