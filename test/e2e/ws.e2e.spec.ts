@@ -60,6 +60,7 @@ describe('WebSocket E2E', () => {
       ).expect(201);
 
       const wsB = await createWsClient(app, userB.accessToken);
+      await new Promise((r) => setTimeout(r, 200));
       await sendWsMessage(wsB, 'room:join', { conversationId });
 
       const db = app.get(DatabaseService);

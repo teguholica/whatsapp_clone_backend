@@ -27,95 +27,113 @@ export class WsGateway {
     this.wss = new WsServer({ server: httpServer });
     console.log('[WS] Raw WebSocket server attached');
 
-    this.wss.on('connection', async (client: WebSocket, req: any) => {
+    this.wss.on('connection', (client: WebSocket, req: any) => {
       const token = this.extractToken(req);
       if (!token) {
         client.close(4001, 'Authentication required');
         return;
       }
 
-      const user = await this.validateToken(token);
-      if (!user) {
-        client.close(4001, 'Invalid or expired token');
-        return;
-      }
-
-      const sessionKey = `session:${user.id}`;
-      const storedToken = await this.redis.getClient().get(sessionKey);
-      if (!storedToken || storedToken !== token) {
-        client.close(4001, 'Session no longer active');
-        return;
-      }
-
-      this.connections.set(client, user);
-      (client as any).__userId = user.id;
+      const pendingMessages: any[] = [];
 
       client.on('message', (raw: Buffer) => {
         let msg: any;
         try { msg = JSON.parse(raw.toString()); } catch { return; }
         if (!msg.event) return;
-
-        switch (msg.event) {
-          case 'room:join': {
-            const roomUser = this.connections.get(client);
-            const roomData = msg.data || {};
-            if (!roomUser || !roomData.conversationId) break;
-            this.rooms.join(client, roomData.conversationId);
-            this.deliverPending(client, roomData.conversationId, roomUser.id);
-            break;
-          }
-          case 'room:leave': {
-            const leaveData = msg.data || {};
-            if (leaveData.conversationId) this.rooms.leave(client, leaveData.conversationId);
-            break;
-          }
-          case 'message:read': {
-            const readUser = this.connections.get(client);
-            const readData = msg.data || {};
-            if (readUser && readData.messageId) this.markRead(readData.messageId, readUser.id);
-            break;
-          }
-          case 'typing:start':
-          case 'typing:stop': {
-            const typingUser = this.connections.get(client);
-            const typingData = msg.data || {};
-            if (typingUser && typingData.conversationId) {
-              this.handleTyping(client, typingUser, msg.event, typingData.conversationId);
-            }
-            break;
-          }
-          case 'presence:online': {
-            const presenceUser = this.connections.get(client);
-            if (presenceUser) {
-              this.broadcastToAll('presence', { userId: presenceUser.id, status: 'online' });
-            }
-            break;
-          }
+        if (!(client as any).__userId) {
+          pendingMessages.push(msg);
+          return;
         }
+        this.handleWsMessage(client, msg);
       });
+      client.on('close', () => this.handleClose(client));
 
-      client.on('close', async () => {
-        const user = this.connections.get(client);
-        this.rooms.leaveAll(client);
-        this.connections.delete(client);
-        if (user) {
-          await this.db.getPool().query(
-            'UPDATE users SET last_seen_at = NOW() WHERE id = $1', [user.id],
-          );
-          this.broadcastToAll('presence', {
-            userId: user.id,
-            status: 'offline',
-            lastSeenAt: new Date().toISOString(),
-          });
-          for (const [key, timeout] of this.typingTimeouts) {
-            if (key.endsWith(`:${user.id}`)) {
-              clearTimeout(timeout);
-              this.typingTimeouts.delete(key);
-            }
-          }
-        }
-      });
+      this.authenticate(client, token, pendingMessages);
     });
+  }
+
+  private async authenticate(client: WebSocket, token: string, pendingMessages: any[]): Promise<void> {
+    const user = await this.validateToken(token);
+    if (!user) {
+      client.close(4001, 'Invalid or expired token');
+      return;
+    }
+
+    const sessionKey = `session:${user.id}`;
+    const storedToken = await this.redis.getClient().get(sessionKey);
+    if (!storedToken || storedToken !== token) {
+      client.close(4001, 'Session no longer active');
+      return;
+    }
+
+    this.connections.set(client, user);
+    (client as any).__userId = user.id;
+
+    for (const msg of pendingMessages) {
+      this.handleWsMessage(client, msg);
+    }
+  }
+
+  private handleWsMessage(client: WebSocket, msg: any): void {
+    switch (msg.event) {
+      case 'room:join': {
+        const roomUser = this.connections.get(client);
+        const roomData = msg.data || {};
+        if (!roomUser || !roomData.conversationId) break;
+        this.rooms.join(client, roomData.conversationId);
+        this.deliverPending(client, roomData.conversationId, roomUser.id);
+        break;
+      }
+      case 'room:leave': {
+        const leaveData = msg.data || {};
+        if (leaveData.conversationId) this.rooms.leave(client, leaveData.conversationId);
+        break;
+      }
+      case 'message:read': {
+        const readUser = this.connections.get(client);
+        const readData = msg.data || {};
+        if (readUser && readData.messageId) this.markRead(readData.messageId, readUser.id);
+        break;
+      }
+      case 'typing:start':
+      case 'typing:stop': {
+        const typingUser = this.connections.get(client);
+        const typingData = msg.data || {};
+        if (typingUser && typingData.conversationId) {
+          this.handleTyping(client, typingUser, msg.event, typingData.conversationId);
+        }
+        break;
+      }
+      case 'presence:online': {
+        const presenceUser = this.connections.get(client);
+        if (presenceUser) {
+          this.broadcastToAll('presence', { userId: presenceUser.id, status: 'online' });
+        }
+        break;
+      }
+    }
+  }
+
+  private async handleClose(client: WebSocket): Promise<void> {
+    const user = this.connections.get(client);
+    this.rooms.leaveAll(client);
+    this.connections.delete(client);
+    if (user) {
+      await this.db.getPool().query(
+        'UPDATE users SET last_seen_at = NOW() WHERE id = $1', [user.id],
+      );
+      this.broadcastToAll('presence', {
+        userId: user.id,
+        status: 'offline',
+        lastSeenAt: new Date().toISOString(),
+      });
+      for (const [key, timeout] of this.typingTimeouts) {
+        if (key.endsWith(`:${user.id}`)) {
+          clearTimeout(timeout);
+          this.typingTimeouts.delete(key);
+        }
+      }
+    }
   }
 
   private async handleTyping(client: WebSocket, user: AuthUser, event: string, conversationId: string): Promise<void> {

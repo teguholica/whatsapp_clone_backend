@@ -221,16 +221,16 @@ E2E tests exercise the full stack against a real PostgreSQL (`whatsapp_test` dat
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `auth.e2e.spec.ts` | 8 | register, verify, refresh, rate limit |
+| `auth.e2e.spec.ts` | 9 | register, verify, refresh, rate limit |
 | `health.e2e.spec.ts` | 1 | health endpoint |
-| `user.e2e.spec.ts` | 7 | profile CRUD, search |
-| `conversation.e2e.spec.ts` | 9 | create, list, detail, leave, idempotent |
-| `message.e2e.spec.ts` | 11 | send, paginate, delete, 30min window |
-| `group.e2e.spec.ts` | 12 | CRUD, members, admins, RBAC |
+| `user.e2e.spec.ts` | 9 | profile CRUD, search |
+| `conversation.e2e.spec.ts` | 10 | create, list, detail, leave, idempotent |
+| `message.e2e.spec.ts` | 17 | send, paginate, delete, 30min window, sent→delivered→read lifecycle |
+| `group.e2e.spec.ts` | 13 | CRUD, members, admins, RBAC |
 | `media.e2e.spec.ts` | 3 | upload, reject invalid type, auth |
-| `ws.e2e.spec.ts` | 2 | connect valid token, 4001 no token |
+| `ws.e2e.spec.ts` | 8 | connect, auth rejection, room:join/leave, message:read, typing:start/stop, presence:online |
 
-**Total: 59 E2E tests**
+**Total: 70 E2E tests**
 
 ## Environment Variables
 

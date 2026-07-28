@@ -250,6 +250,7 @@ describe('Message E2E', () => {
       const msg = await sendMessage(userA.accessToken, 'Hello!');
 
       const wsB = await createWsClient(app, userB.accessToken);
+      await new Promise((r) => setTimeout(r, 200));
 
       const db = app.get(DatabaseService);
 
