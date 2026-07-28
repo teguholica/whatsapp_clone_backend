@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Inject, HttpException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RateLimitService } from './rate-limit.service';
-import { RegisterDto, VerifyDto } from './auth.types';
+import { RegisterDto, VerifyDto, RefreshDto } from './auth.types';
 
 @Controller('auth')
 export class AuthController {
@@ -27,5 +27,11 @@ export class AuthController {
       throw new HttpException('Too many attempts', HttpStatus.TOO_MANY_REQUESTS);
     }
     return this.auth.verify(dto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() dto: RefreshDto) {
+    return this.auth.refresh(dto.refreshToken);
   }
 }

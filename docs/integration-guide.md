@@ -80,11 +80,37 @@ Content-Type: application/json
 
 ### 4. Refresh token
 
-For MVP there is no dedicated refresh endpoint. When the access token expires:
+When the access token expires (15 minutes), use the refresh token to get new ones:
 
-1. Call `POST /api/auth/register` with the same phone to get a new OTP.
-2. Call `POST /api/auth/verify` to get new tokens.
-3. Update stored tokens and reconnect WebSocket.
+```
+POST /api/auth/refresh
+Content-Type: application/json
+Authorization: Bearer <accessToken>
+
+{ "refreshToken": "<refreshToken>" }
+```
+
+**Response:**
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": "01ABCD...",
+    "phone": "+628123456789",
+    "displayName": null
+  }
+}
+```
+
+**What happens:**
+- Server validates the refresh token signature and checks it matches the token stored in Redis at `refresh:{userId}`.
+- Invalid, mismatched, or expired refresh token returns `401 Unauthorized`.
+- On success: both tokens are rotated. The previous refresh token is invalidated. The old access token remains valid until it expires naturally (15-minute window).
+- The client should discard the old tokens after refresh.
+
+**Rate limit:** 5 attempts per minute per user (independent of `/api/auth/verify`).
 
 ### 5. Single-device enforcement
 
@@ -781,7 +807,7 @@ When an offline user connects and joins a conversation room, the server runs `de
 
 When a REST API call returns 401 or WebSocket closes with 4001:
 
-1. Use the `refreshToken` to get a new JWT. (For MVP: re-run `/api/auth/verify` with a new OTP.)
+1. Call `POST /api/auth/refresh` with the stored `refreshToken` to get new tokens.
 2. Reconnect WebSocket with the new token.
 
 ### Rate limited (429)
@@ -822,7 +848,10 @@ The `/api/auth/verify` endpoint is rate-limited to 5 attempts per minute per pho
 
 1. Check if WebSocket is closed.
 2. If closed: reconnect with stored JWT.
-3. If 4001 close (session expired): re-authenticate → get new JWT → reconnect.
+3. If 4001 close (session expired):
+   a. Call `POST /api/auth/refresh` with the stored refresh token.
+   b. If refresh succeeds: store new tokens and reconnect with the new access token.
+   c. If refresh fails (401): call `POST /api/auth/register` for a new OTP → re-authenticate.
 4. Re-join conversation rooms.
 5. Fetch latest messages via REST (cursor pagination from last known message).
 

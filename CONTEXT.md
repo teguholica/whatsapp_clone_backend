@@ -33,6 +33,10 @@ _Avoid_: Ack, confirmation
 **AuthSession**:
 A JWT-based session tied to a phone number verified via OTP. Single device per user for MVP.
 
+**RefreshToken**:
+A rotating JWT (7-day expiry, signed with `JWT_REFRESH_SECRET`) issued alongside the access token. Stored in Redis at `refresh:{userId}` for rotation enforcement — each refresh invalidates the previous refresh token. Sent only to `POST /api/auth/refresh`. Never sent as Bearer.
+_Avoid_: Session token, long-lived token
+
 **Media**:
 Binary content attached to a message: image, video, audio, or document. Stored on local disk with S3-ready abstraction. Max: image 16MB, video 64MB, document 100MB.
 

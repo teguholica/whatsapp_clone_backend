@@ -1,4 +1,4 @@
-import { IsString, Length, Matches } from 'class-validator';
+import { IsString, MinLength, Length, Matches } from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -15,6 +15,12 @@ export class VerifyDto {
   @Length(6, 6, { message: 'OTP must be exactly 6 digits' })
   @Matches(/^\d{6}$/, { message: 'OTP must be numeric' })
   otp: string;
+}
+
+export class RefreshDto {
+  @IsString()
+  @MinLength(1)
+  refreshToken: string;
 }
 
 export interface AuthResponse {
