@@ -203,7 +203,35 @@ Offline messages delivered via `deliverPending` on room join — status transiti
 npm test
 ```
 
-Unit tests use `@nestjs/testing` with mocked services (DatabaseService, RedisService, JwtService). Located next to source files (`*.spec.ts`).
+Unit tests use `@nestjs/testing` with mocked dependencies. Located next to source files (`*.spec.ts`).
+
+**Test files** (`src/**/*.spec.ts`):
+
+| File | Tests | Scope |
+|------|-------|-------|
+| `auth/auth.controller.spec.ts` | 1 | refresh delegation |
+| `auth/auth.service.spec.ts` | 7 | register, verify, refresh, device invalidation |
+| `auth/jwt.strategy.spec.ts` | 3 | Redis session — match, missing, mismatch |
+| `auth/otp.service.spec.ts` | 6 | generate, verify, expiry, max attempts |
+| `auth/rate-limit.service.spec.ts` | 4 | sliding window, exempt verify endpoint |
+| `conversation/conversation.controller.spec.ts` | 4 | create, list, get, leave delegation |
+| `conversation/conversation.service.spec.ts` | 10 | create, list, getDetail, leave, edge cases |
+| `group/group.controller.spec.ts` | 6 | all 6 endpoint delegations |
+| `group/group.service.spec.ts` | 12 | CRUD, members, admins, RBAC, validation |
+| `health/health.controller.spec.ts` | 4 | DB + Redis health — ok, degraded |
+| `media/local-disk-storage.spec.ts` | 3 | save, overwrite, missing dir |
+| `media/media.controller.spec.ts` | 1 | upload delegation |
+| `media/media.service.spec.ts` | 14 | upload, reject invalid type, reject oversize, provider |
+| `message/message.controller.spec.ts` | 9 | validation (length, mode) + delegation |
+| `message/message.service.spec.ts` | 13 | send, list, paginate, delete me/everyone, 30min window |
+| `shared/database/database.service.spec.ts` | 5 | isHealthy, lifecycle |
+| `shared/redis/redis.service.spec.ts` | 5 | isHealthy, lifecycle |
+| `user/user.controller.spec.ts` | 5 | me, updateMe, search + empty-phone guard |
+| `user/user.service.spec.ts` | 11 | getProfile, updateProfile, searchByPhone |
+| `ws/ws.gateway.spec.ts` | 10 | connect, handleMessage, room events, presence |
+| `ws/ws-room-manager.spec.ts` | 9 | join, leave, broadcast, cleanup on disconnect |
+
+**Total: 140 unit tests**
 
 ### E2E Tests
 
