@@ -22,6 +22,10 @@ export class MessageController {
       throw new BadRequestException('Message text must be between 1 and 4096 characters');
     }
     const type = typeof body?.type === 'string' ? body.type : 'text';
+    const allowedTypes = ['text', 'image', 'video', 'document'];
+    if (!allowedTypes.includes(type)) {
+      throw new BadRequestException('Invalid message type');
+    }
     return this.msg.send(conversationId, user.id, content, type);
   }
 

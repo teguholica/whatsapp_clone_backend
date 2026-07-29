@@ -1,4 +1,4 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject, UnauthorizedException, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ulid } from 'ulid';
 import { DatabaseService } from '../shared/database/database.service';
@@ -79,7 +79,7 @@ export class AuthService {
 
     const allowed = await this.rateLimit.check(`refresh:${payload.sub}`, 5, 60);
     if (!allowed) {
-      throw new UnauthorizedException('Too many attempts');
+      throw new HttpException('Too many attempts', HttpStatus.TOO_MANY_REQUESTS);
     }
 
     const stored = await this.redis.getClient().get(`refresh:${payload.sub}`);

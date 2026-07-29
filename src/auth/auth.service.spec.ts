@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { HttpException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { DatabaseService } from '../shared/database/database.service';
 import { RedisService } from '../shared/redis/redis.service';
@@ -126,11 +126,11 @@ describe('AuthService', () => {
       expect(rateLimit.check).not.toHaveBeenCalled();
     });
 
-    it('throws when rate limited', async () => {
+    it('throws 429 when rate limited', async () => {
       jwt.verify.mockReturnValue({ sub: userId, phone });
       rateLimit.check.mockResolvedValue(false);
 
-      await expect(auth.refresh(oldRefreshToken)).rejects.toThrow(UnauthorizedException);
+      await expect(auth.refresh(oldRefreshToken)).rejects.toThrow(HttpException);
       expect(rateLimit.check).toHaveBeenCalledWith(`refresh:${userId}`, 5, 60);
       expect(mockRedisClient.get).not.toHaveBeenCalled();
     });

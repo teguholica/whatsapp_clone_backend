@@ -106,6 +106,7 @@ Content-Type: application/json
 **What happens:**
 - Server validates the refresh token signature and checks it matches the token stored in Redis at `refresh:{userId}`.
 - Invalid, mismatched, or expired refresh token returns `401 Unauthorized`.
+- Rate limited returns `429 Too Many Requests`.
 - On success: both tokens are rotated. The previous refresh token is invalidated. The old access token remains valid until it expires naturally (15-minute window).
 - The client should discard the old tokens after refresh.
 
