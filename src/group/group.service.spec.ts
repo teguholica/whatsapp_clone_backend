@@ -70,6 +70,14 @@ describe('GroupService', () => {
         svc.create(userId, { name: 'Test', members: ['+62800000000'] }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('throws when creator includes own phone in members', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [{ id: userId }] });
+
+      await expect(
+        svc.create(userId, { name: 'Test', members: ['+62812345678'] }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('update', () => {
@@ -163,8 +171,7 @@ describe('GroupService', () => {
     it('promotes member to admin by super admin', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
-        .mockResolvedValueOnce({ rows: [{ id: convId }] })
-        .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+        .mockResolvedValueOnce({ rows: [{ user_id: userId }] })
         .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ id: convId, name: 'G', type: 'group', created_at: new Date() }] })
@@ -178,14 +185,23 @@ describe('GroupService', () => {
       );
       expect(insert).toBeDefined();
     });
+
+    it('throws ForbiddenException when non-super-admin tries to promote', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+        .mockResolvedValueOnce({ rows: [{ user_id: 'someone-else' }] });
+
+      await expect(
+        svc.promoteAdmin(convId, otherId, { userId: 'userX' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
   });
 
   describe('demoteAdmin', () => {
     it('demotes admin by super admin', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
-        .mockResolvedValueOnce({ rows: [{ id: convId }] })
-        .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
+        .mockResolvedValueOnce({ rows: [{ user_id: userId }] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ id: convId, name: 'G', type: 'group', created_at: new Date() }] })
         .mockResolvedValueOnce({ rows: [] })
@@ -202,8 +218,7 @@ describe('GroupService', () => {
     it('throws on self-demotion', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ 1: 1 }] })
-        .mockResolvedValueOnce({ rows: [{ id: convId }] })
-        .mockResolvedValueOnce({ rows: [{ 1: 1 }] });
+        .mockResolvedValueOnce({ rows: [{ user_id: userId }] });
 
       await expect(
         svc.demoteAdmin(convId, userId, { userId }),

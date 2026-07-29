@@ -14,12 +14,14 @@ export class GroupService {
       throw new BadRequestException(`Group cannot exceed ${this.maxMembers} members`);
     }
 
-    const phoneSet = [...new Set([...dto.members, userId])];
-    if (phoneSet.length < dto.members.length + 1) {
-      throw new BadRequestException('Cannot add yourself or duplicate members via phone');
-    }
-
     const memberIds = await this.resolvePhones(dto.members);
+
+    if (memberIds.includes(userId)) {
+      throw new BadRequestException('Cannot add yourself');
+    }
+    if (new Set(memberIds).size !== memberIds.length) {
+      throw new BadRequestException('Duplicate members');
+    }
 
     const convId = ulid();
     await this.db.getPool().query(
@@ -27,9 +29,10 @@ export class GroupService {
       [convId, 'group', dto.name],
     );
 
-    const values = memberIds.map((id: string) => `('${convId}', '${id}')`).join(', ');
     await this.db.getPool().query(
-      `INSERT INTO conversation_members (conversation_id, user_id) VALUES ${values}`,
+      `INSERT INTO conversation_members (conversation_id, user_id)
+       SELECT $1, unnest($2::text[])`,
+      [convId, memberIds],
     );
 
     await this.db.getPool().query(
@@ -158,18 +161,17 @@ export class GroupService {
 
   private async requireSuperAdmin(convId: string, userId: string): Promise<void> {
     await this.requireAdmin(convId, userId);
-    const conv = await this.db.getPool().query(
-      'SELECT id FROM conversations WHERE id = $1', [convId],
-    );
-    if (conv.rows.length === 0) throw new NotFoundException('Group not found');
 
-    const isFirst = await this.db.getPool().query(
-      `SELECT 1 FROM group_admins WHERE conversation_id = $1
-       ORDER BY (SELECT created_at FROM conversations WHERE id = $2)
-       LIMIT 1`,
-      [convId, convId],
+    // ponytail: ctid reflects insertion order but VACUUM can change it
+    // upgrade: add creator_id to conversations table
+    const first = await this.db.getPool().query(
+      `SELECT user_id FROM group_admins WHERE conversation_id = $1
+       ORDER BY ctid LIMIT 1`,
+      [convId],
     );
-    /* For MVP: first admin is super admin (created during group creation) */
+    if (first.rows.length === 0 || first.rows[0].user_id !== userId) {
+      throw new ForbiddenException('Super admin access required');
+    }
   }
 
   private async requireMember(convId: string, userId: string): Promise<void> {

@@ -55,6 +55,14 @@ describe('Group E2E', () => {
           .send({ name: 'Bad', members: ['not-a-phone'] }),
       ).expect(400);
     });
+
+    it('fails when creator includes own phone in members', async () => {
+      await auth(owner.accessToken)(
+        request(app.getHttpServer())
+          .post('/api/groups')
+          .send({ name: 'Self', members: [owner.phone] }),
+      ).expect(400);
+    });
   });
 
   describe('PUT /api/groups/:id', () => {
@@ -154,6 +162,22 @@ describe('Group E2E', () => {
 
     it('returns 403 for non-admin', async () => {
       const group = await createGroup(owner.accessToken);
+
+      await auth(memberA.accessToken)(
+        request(app.getHttpServer())
+          .post(`/api/groups/${group.body.id}/admins`)
+          .send({ userId: memberB.user.id }),
+      ).expect(403);
+    });
+
+    it('returns 403 when non-super-admin tries to promote', async () => {
+      const group = await createGroup(owner.accessToken);
+
+      await auth(owner.accessToken)(
+        request(app.getHttpServer())
+          .post(`/api/groups/${group.body.id}/admins`)
+          .send({ userId: memberA.user.id }),
+      ).expect(201);
 
       await auth(memberA.accessToken)(
         request(app.getHttpServer())

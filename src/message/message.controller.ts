@@ -21,7 +21,8 @@ export class MessageController {
     if (content.length < 1 || content.length > 4096) {
       throw new BadRequestException('Message text must be between 1 and 4096 characters');
     }
-    return this.msg.send(conversationId, user.id, content);
+    const type = typeof body?.type === 'string' ? body.type : 'text';
+    return this.msg.send(conversationId, user.id, content, type);
   }
 
   @Get(':conversationId')

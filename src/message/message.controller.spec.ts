@@ -59,8 +59,24 @@ describe('MessageController', () => {
 
       const result = await ctrl.send(mockUser, 'conv-1', { content: 'Hello' });
 
-      expect(msg.send).toHaveBeenCalledWith('conv-1', 'u1', 'Hello');
+      expect(msg.send).toHaveBeenCalledWith('conv-1', 'u1', 'Hello', 'text');
       expect(result).toEqual(mockMessage);
+    });
+
+    it('passes type to msg.send when provided', async () => {
+      msg.send.mockResolvedValue({ ...mockMessage, type: 'image' });
+
+      const result = await ctrl.send(mockUser, 'conv-1', { content: 'Photo', type: 'image' });
+
+      expect(msg.send).toHaveBeenCalledWith('conv-1', 'u1', 'Photo', 'image');
+    });
+
+    it('defaults type to text when not provided', async () => {
+      msg.send.mockResolvedValue(mockMessage);
+
+      await ctrl.send(mockUser, 'conv-1', { content: 'Hi' });
+
+      expect(msg.send).toHaveBeenCalledWith('conv-1', 'u1', 'Hi', 'text');
     });
   });
 

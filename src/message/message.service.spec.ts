@@ -77,6 +77,7 @@ describe('MessageService', () => {
         expect.any(String),
         conversationId,
         userId,
+        'text',
         'Hello!',
       ]);
 
@@ -118,7 +119,6 @@ describe('MessageService', () => {
         conversationId,
         'message:status',
         { messageId: expect.any(String), userId: otherId, status: 'delivered' },
-        userId,
       );
     });
 

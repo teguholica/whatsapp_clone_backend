@@ -148,6 +148,23 @@ describe('WsGateway', () => {
     });
   });
 
+  describe('broadcastToAll', () => {
+    it('excludes sender when excludeUserId provided', () => {
+      const sender = makeClient('sender');
+      const recipient = makeClient('recipient');
+      const other = makeClient('other');
+      (gateway as any).connections.set(sender, { id: 'sender', phone: '+1' });
+      (gateway as any).connections.set(recipient, { id: 'recipient', phone: '+2' });
+      (gateway as any).connections.set(other, { id: 'other', phone: '+3' });
+
+      (gateway as any).broadcastToAll('presence', { userId: 'sender', status: 'online' }, 'sender');
+
+      expect(sender.send).not.toHaveBeenCalled();
+      expect(recipient.send).toHaveBeenCalled();
+      expect(other.send).toHaveBeenCalled();
+    });
+  });
+
   describe('deliverPending', () => {
     const userId = 'userB';
     const conversationId = 'conv1';

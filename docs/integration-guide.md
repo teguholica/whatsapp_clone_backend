@@ -85,7 +85,6 @@ When the access token expires (15 minutes), use the refresh token to get new one
 ```
 POST /api/auth/refresh
 Content-Type: application/json
-Authorization: Bearer <accessToken>
 
 { "refreshToken": "<refreshToken>" }
 ```
@@ -799,7 +798,6 @@ When an offline user connects and joins a conversation room, the server runs `de
 | 401 | Unauthorized (missing/expired/invalid JWT) |
 | 403 | Forbidden (not a member, not admin) |
 | 404 | Resource not found |
-| 409 | Conflict (already exists) |
 | 413 | Payload too large (file exceeds size limit) |
 | 429 | Too many requests (rate limited) |
 

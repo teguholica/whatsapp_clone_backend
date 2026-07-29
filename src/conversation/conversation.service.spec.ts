@@ -101,6 +101,20 @@ describe('ConversationService', () => {
       expect(result[0].otherUser).toEqual({ id: targetId, displayName: 'User 2' });
     });
 
+    it('returns null otherUser for group conversations', async () => {
+      const now = new Date();
+      mockPool.query.mockResolvedValueOnce({
+        rows: [
+          { id: 'g1', type: 'group', created_at: now, other_id: 'someone', other_name: null, last_content: 'Hello', last_created: now },
+        ],
+      });
+
+      const result = await svc.list(userId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].otherUser).toBeNull();
+    });
+
     it('excludes conversations user has left', async () => {
       mockPool.query.mockResolvedValueOnce({ rows: [] });
 

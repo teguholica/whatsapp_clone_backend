@@ -8,7 +8,7 @@ export class SendMessageDto {
 
   @IsString()
   @IsOptional()
-  @IsIn(['text'])
+  @IsIn(['text', 'image', 'video', 'document'])
   type?: string;
 }
 

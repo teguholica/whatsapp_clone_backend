@@ -11,7 +11,7 @@ export class MessageService {
     @Inject(WsGateway) private ws: WsGateway,
   ) {}
 
-  async send(conversationId: string, senderId: string, content: string): Promise<MessageResponse> {
+  async send(conversationId: string, senderId: string, content: string, type: string = 'text'): Promise<MessageResponse> {
     const conv = await this.db.getPool().query(
       `SELECT c.id FROM conversations c
        JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id = $1 AND cm.left_at IS NULL
@@ -22,8 +22,8 @@ export class MessageService {
 
     const id = ulid();
     await this.db.getPool().query(
-      `INSERT INTO messages (id, conversation_id, sender_id, type, content) VALUES ($1, $2, $3, 'text', $4)`,
-      [id, conversationId, senderId, content],
+      `INSERT INTO messages (id, conversation_id, sender_id, type, content) VALUES ($1, $2, $3, $4, $5)`,
+      [id, conversationId, senderId, type, content],
     );
 
     const members = await this.db.getPool().query(
@@ -52,7 +52,7 @@ export class MessageService {
         );
         this.ws.broadcastToRoom(conversationId, 'message:status', {
           messageId: id, userId, status: 'delivered',
-        }, senderId);
+        });
       }
     }
 

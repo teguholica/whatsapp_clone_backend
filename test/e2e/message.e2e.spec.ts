@@ -49,10 +49,29 @@ describe('Message E2E', () => {
         conversationId,
         senderId: userA.user.id,
         type: 'text',
-        content: 'Hello!',
       });
       expect(res.body).toHaveProperty('id');
       expect(res.body).toHaveProperty('createdAt');
+    });
+
+    it('sends a message with image type', async () => {
+      const res = await auth(userA.accessToken)(
+        request(app.getHttpServer())
+          .post(`/api/messages/${conversationId}`)
+          .send({ content: 'Photo!', type: 'image' }),
+      ).expect(201);
+
+      expect(res.body.type).toBe('image');
+    });
+
+    it('defaults type to text when not provided', async () => {
+      const res = await auth(userA.accessToken)(
+        request(app.getHttpServer())
+          .post(`/api/messages/${conversationId}`)
+          .send({ content: 'Hello' }),
+      ).expect(201);
+
+      expect(res.body.type).toBe('text');
     });
 
     it('returns 400 with empty content', async () => {

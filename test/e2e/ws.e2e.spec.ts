@@ -206,6 +206,21 @@ describe('WebSocket E2E', () => {
       wsA.close();
       wsB.close();
     });
+
+    it('presence:online does not send presence event back to sender', async () => {
+      const wsA = await createWsClient(app, userA.accessToken);
+      const wsB = await createWsClient(app, userB.accessToken);
+
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+      const presencePromise = waitForWsEvent(wsA, 'presence');
+      await sendWsMessage(wsA, 'presence:online', {});
+
+      const result = await Promise.race([presencePromise, timeoutPromise]);
+      expect(result).toBeNull();
+
+      wsA.close();
+      wsB.close();
+    });
   });
 
   describe('message read events', () => {

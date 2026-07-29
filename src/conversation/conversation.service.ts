@@ -34,7 +34,7 @@ export class ConversationService {
 
   async list(userId: string): Promise<ConversationSummary[]> {
     const result = await this.db.getPool().query(
-      `SELECT c.id, c.type, c.created_at,
+      `SELECT DISTINCT ON (c.id) c.id, c.type, c.created_at,
               cm2.user_id AS other_id, u.display_name AS other_name,
               m.content AS last_content, m.created_at AS last_created
        FROM conversations c
@@ -46,14 +46,14 @@ export class ConversationService {
          WHERE conversation_id = c.id AND deleted_at IS NULL
          ORDER BY created_at DESC LIMIT 1
        ) m ON true
-       ORDER BY COALESCE(m.created_at, c.created_at) DESC`,
+       ORDER BY c.id, COALESCE(m.created_at, c.created_at) DESC`,
       [userId],
     );
 
     return result.rows.map((row: any) => ({
       id: row.id,
       type: row.type,
-      otherUser: row.other_id ? { id: row.other_id, displayName: row.other_name ?? null } : null,
+      otherUser: row.type === 'group' ? null : (row.other_id ? { id: row.other_id, displayName: row.other_name ?? null } : null),
       lastMessage: row.last_content ? { content: row.last_content, createdAt: row.last_created } : null,
       unreadCount: 0,
       createdAt: row.created_at,

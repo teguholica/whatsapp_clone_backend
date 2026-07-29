@@ -107,7 +107,7 @@ export class WsGateway {
       case 'presence:online': {
         const presenceUser = this.connections.get(client);
         if (presenceUser) {
-          this.broadcastToAll('presence', { userId: presenceUser.id, status: 'online' });
+          this.broadcastToAll('presence', { userId: presenceUser.id, status: 'online' }, presenceUser.id);
         }
         break;
       }
@@ -169,9 +169,10 @@ export class WsGateway {
     } catch { return null; }
   }
 
-  private broadcastToAll(event: string, data: any): void {
+  private broadcastToAll(event: string, data: any, excludeUserId?: string): void {
     const message = JSON.stringify({ event, data });
-    for (const [client] of this.connections) {
+    for (const [client, user] of this.connections) {
+      if (user.id === excludeUserId) continue;
       if (client.readyState === 1) client.send(message);
     }
   }
