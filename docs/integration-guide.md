@@ -453,7 +453,7 @@ Content-Type: application/json
 
 **Validation:**
 - `content`: required, must be between 1 and 4,096 characters (manually validated by controller).
-- `type`: currently always set to `"text"` by the server.
+- `type`: optional, defaults to `"text"`. Accepted values: `text`, `image`, `video`, `document`.
 
 **Real-time side-effect:**
 1. Server saves message and creates `message_status` rows for all other members (initial status: `sent`).
