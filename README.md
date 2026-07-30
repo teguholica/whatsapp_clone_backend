@@ -1,5 +1,13 @@
 # WhatsApp Clone Backend
 
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Node](https://img.shields.io/badge/Node-22.x-339933?style=flat-square&logo=nodedotjs&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS-10-E0234E?style=flat-square&logo=nestjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-FF4438?style=flat-square&logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-210-C21325?style=flat-square&logo=jest&logoColor=white)
+
 Real-time messaging backend, clone of WhatsApp. Chat 1-on-1, group chat, delivery tracking, typing indicator, presence, phone + OTP auth.
 
 ## Tech Stack
